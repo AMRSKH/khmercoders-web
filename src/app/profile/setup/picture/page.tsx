@@ -35,6 +35,7 @@ export default function ProfileSetupPicturePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
@@ -75,11 +76,19 @@ export default function ProfileSetupPicturePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Invalid file type', description: 'Please select an image file.', variant: 'destructive' });
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image file.',
+        variant: 'destructive',
+      });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Image must be less than 5MB.', variant: 'destructive' });
+      toast({
+        title: 'File too large',
+        description: 'Image must be less than 5MB.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -126,20 +135,19 @@ export default function ProfileSetupPicturePage() {
     if (!img) return;
     setIsCropping(true);
     try {
-      const v = VIEW_SIZE;
-      const s = scale;
-      const imgW = imageSize.width;
-      const imgH = imageSize.height;
+      const viewport = viewportRef.current;
+      if (!viewport) throw new Error('Crop viewport is not available');
 
-      const origX = (0 - v / 2 - pan.x) / s + imgW / 2;
-      const origY = (0 - v / 2 - pan.y) / s + imgH / 2;
-      const cropW = v / s;
-      const cropH = v / s;
+      const imgRect = img.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
 
-      const sx = clamp(origX, 0, imgW - 1);
-      const sy = clamp(origY, 0, imgH - 1);
-      const sw = clamp(cropW, 1, imgW - sx);
-      const sh = clamp(cropH, 1, imgH - sy);
+      const scaleX = img.naturalWidth / imgRect.width;
+      const scaleY = img.naturalHeight / imgRect.height;
+
+      const sx = clamp((viewportRect.left - imgRect.left) * scaleX, 0, img.naturalWidth - 1);
+      const sy = clamp((viewportRect.top - imgRect.top) * scaleY, 0, img.naturalHeight - 1);
+      const sw = clamp(viewportRect.width * scaleX, 1, img.naturalWidth - sx);
+      const sh = clamp(viewportRect.height * scaleY, 1, img.naturalHeight - sy);
 
       const canvas = document.createElement('canvas');
       canvas.width = OUTPUT_SIZE;
@@ -150,9 +158,7 @@ export default function ProfileSetupPicturePage() {
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
 
-      const blob = await new Promise<Blob | null>(resolve =>
-        canvas.toBlob(resolve, 'image/png')
-      );
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Failed to crop image');
 
       const croppedFile = new File([blob], 'profile.png', { type: 'image/png' });
@@ -172,7 +178,7 @@ export default function ProfileSetupPicturePage() {
     } finally {
       setIsCropping(false);
     }
-  }, [rawImageSrc, imageSize, scale, pan, revoke, selectedImage, toast, resetCropState]);
+  }, [rawImageSrc, revoke, selectedImage, toast, resetCropState]);
 
   const handleCropCancel = () => {
     setCropOpen(false);
@@ -201,7 +207,10 @@ export default function ProfileSetupPicturePage() {
         throw new Error(errorData.error || 'Failed to upload image');
       }
       setUploadProgress(100);
-      toast({ title: 'Profile picture updated', description: 'Your profile picture has been updated successfully.' });
+      toast({
+        title: 'Profile picture updated',
+        description: 'Your profile picture has been updated successfully.',
+      });
       setSelectedFile(null);
       setTimeout(() => router.refresh(), 1000);
     } catch (error) {
@@ -243,8 +252,8 @@ export default function ProfileSetupPicturePage() {
           <CardHeader>
             <CardTitle>Upload Profile Picture</CardTitle>
             <CardDescription>
-              Choose an image to represent you on the platform. You can crop and reposition it before
-              uploading.
+              Choose an image to represent you on the platform. You can crop and reposition it
+              before uploading.
             </CardDescription>
           </CardHeader>
 
@@ -252,9 +261,19 @@ export default function ProfileSetupPicturePage() {
             <div className="flex flex-col items-center space-y-6">
               <div className="w-40 h-40 relative rounded-full overflow-hidden border-2 border-primary/40">
                 {selectedImage ? (
-                  <Image src={selectedImage} alt="Selected profile picture" fill className="object-cover" />
+                  <Image
+                    src={selectedImage}
+                    alt="Selected profile picture"
+                    fill
+                    className="object-cover"
+                  />
                 ) : userImage ? (
-                  <Image src={userImage} alt="Current profile picture" fill className="object-cover" />
+                  <Image
+                    src={userImage}
+                    alt="Current profile picture"
+                    fill
+                    className="object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
                     <ImageIcon className="h-16 w-16 text-muted-foreground opacity-30" />
@@ -322,7 +341,11 @@ export default function ProfileSetupPicturePage() {
           </CardContent>
 
           <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => router.push('/profile/setup')} disabled={isUploading}>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/profile/setup')}
+              disabled={isUploading}
+            >
               Cancel
             </Button>
 
@@ -338,17 +361,24 @@ export default function ProfileSetupPicturePage() {
         </Card>
       </div>
 
-      <Dialog open={cropOpen} onOpenChange={open => { if (!open) handleCropCancel(); }}>
+      <Dialog
+        open={cropOpen}
+        onOpenChange={open => {
+          if (!open) handleCropCancel();
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Crop profile picture</DialogTitle>
             <DialogDescription>
-              Drag to reposition and use the slider to zoom. The square area will become your avatar.
+              Drag to reposition and use the slider to zoom. The square area will become your
+              avatar.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col items-center gap-4">
             <div
+              ref={viewportRef}
               className="relative overflow-hidden rounded-lg border bg-muted touch-none"
               style={{ width: VIEW_SIZE, height: VIEW_SIZE }}
               onPointerDown={handlePointerDown}
