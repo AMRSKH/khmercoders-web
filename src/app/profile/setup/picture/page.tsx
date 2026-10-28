@@ -394,12 +394,10 @@ export default function ProfileSetupPicturePage() {
                   draggable={false}
                   style={{
                     position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    width: imageSize.width || 'auto',
-                    height: imageSize.height || 'auto',
-                    transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${scale})`,
-                    transformOrigin: 'center center',
+                    left: (VIEW_SIZE - imageSize.width * scale) / 2 + pan.x,
+                    top: (VIEW_SIZE - imageSize.height * scale) / 2 + pan.y,
+                    width: imageSize.width * scale,
+                    height: imageSize.height * scale,
                     cursor: draggingRef.current ? 'grabbing' : 'grab',
                     userSelect: 'none',
                     maxWidth: 'none',
