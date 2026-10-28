@@ -36,7 +36,7 @@ export default function ProfileSetupPicturePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   const [isUploading, setIsUploading] = useState(false);
@@ -105,27 +105,51 @@ export default function ProfileSetupPicturePage() {
     setPan({ x: 0, y: 0 });
   };
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    draggingRef.current = true;
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
     dragStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    setIsDragging(true);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
-    setPan({ x: dragStartRef.current.panX + dx, y: dragStartRef.current.panY + dy });
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    dragStartRef.current = { x: touch.clientX, y: touch.clientY, panX: pan.x, panY: pan.y };
+    setIsDragging(true);
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    draggingRef.current = false;
-    try {
-      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-  };
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      setPan({ x: dragStartRef.current.panX + dx, y: dragStartRef.current.panY + dy });
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      e.preventDefault();
+      const dx = touch.clientX - dragStartRef.current.x;
+      const dy = touch.clientY - dragStartRef.current.y;
+      setPan({ x: dragStartRef.current.panX + dx, y: dragStartRef.current.panY + dy });
+    };
+
+    const handleEnd = () => setIsDragging(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [isDragging]);
 
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -379,12 +403,10 @@ export default function ProfileSetupPicturePage() {
           <div className="flex flex-col items-center gap-4">
             <div
               ref={viewportRef}
-              className="relative overflow-hidden rounded-lg border bg-muted touch-none"
+              className="relative overflow-hidden rounded-lg border bg-muted touch-none select-none"
               style={{ width: VIEW_SIZE, height: VIEW_SIZE }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
+              onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
             >
               {rawImageSrc && (
                 <img
@@ -398,8 +420,9 @@ export default function ProfileSetupPicturePage() {
                     top: (VIEW_SIZE - imageSize.height * scale) / 2 + pan.y,
                     width: imageSize.width * scale,
                     height: imageSize.height * scale,
-                    cursor: draggingRef.current ? 'grabbing' : 'grab',
+                    cursor: isDragging ? 'grabbing' : 'grab',
                     userSelect: 'none',
+                    pointerEvents: 'none',
                     maxWidth: 'none',
                   }}
                 />
