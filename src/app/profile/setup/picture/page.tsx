@@ -202,7 +202,7 @@ export default function ProfileSetupPicturePage() {
     } finally {
       setIsCropping(false);
     }
-  }, [rawImageSrc, revoke, selectedImage, toast, resetCropState]);
+  }, [rawImageSrc, imageSize, revoke, selectedImage, toast, resetCropState]);
 
   const handleCropCancel = () => {
     setCropOpen(false);
